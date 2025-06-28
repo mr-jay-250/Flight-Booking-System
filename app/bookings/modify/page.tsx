@@ -1,11 +1,12 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
-export default function ModifyBookingPage() {
+// Create a separate component that uses useSearchParams
+function ModifyBookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const bookingId = searchParams.get("id");
@@ -132,62 +133,95 @@ export default function ModifyBookingPage() {
   }
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8">
+      <div>
+        <label className="block font-semibold mb-1">Passenger Name</label>
+        <input
+          type="text"
+          name="full_name"
+          value={form.full_name}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+          required
+        />
+      </div>
+      <div>
+        <label className="block font-semibold mb-1">Nationality</label>
+        <input
+          type="text"
+          name="nationality"
+          value={form.nationality}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block font-semibold mb-1">Passport Number</label>
+        <input
+          type="text"
+          name="passport_number"
+          value={form.passport_number}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+        />
+      </div>
+      <div>
+        <label className="block font-semibold mb-1">Select New Flight</label>
+        <select
+          className="w-full border rounded px-3 py-2"
+          value={selectedFlight?.id || ""}
+          onChange={handleFlightChange}
+        >
+          {flights.map((flight) => (
+            <option key={flight.id} value={flight.id}>
+              {flight.origin} → {flight.destination} | {new Date(flight.departure_time).toLocaleString()}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="submit"
+        className="btn-gradient w-full py-2 font-semibold text-lg rounded"
+        disabled={loading}
+      >
+        Update Booking
+      </button>
+    </form>
+  );
+}
+
+// Loading fallback component
+function ModifyBookingSkeleton() {
+  return (
+    <div className="space-y-6 bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8">
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" />
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20" />
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-28" />
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" />
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+      <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+    </div>
+  );
+}
+
+export default function ModifyBookingPage() {
+  return (
     <div className="max-w-xl mx-auto py-10 px-4">
       <h1 className="text-3xl font-bold mb-8 text-center text-blue-700">Modify Booking</h1>
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8">
-        <div>
-          <label className="block font-semibold mb-1">Passenger Name</label>
-          <input
-            type="text"
-            name="full_name"
-            value={form.full_name}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-            required
-          />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Nationality</label>
-          <input
-            type="text"
-            name="nationality"
-            value={form.nationality}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Passport Number</label>
-          <input
-            type="text"
-            name="passport_number"
-            value={form.passport_number}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Select New Flight</label>
-          <select
-            className="w-full border rounded px-3 py-2"
-            value={selectedFlight?.id || ""}
-            onChange={handleFlightChange}
-          >
-            {flights.map((flight) => (
-              <option key={flight.id} value={flight.id}>
-                {flight.origin} → {flight.destination} | {new Date(flight.departure_time).toLocaleString()}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="btn-gradient w-full py-2 font-semibold text-lg rounded"
-          disabled={loading}
-        >
-          Update Booking
-        </button>
-      </form>
+      <Suspense fallback={<ModifyBookingSkeleton />}>
+        <ModifyBookingForm />
+      </Suspense>
     </div>
   );
 } 
