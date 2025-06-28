@@ -87,4 +87,141 @@ export async function GET(req: Request) {
     console.error('Admin flights API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-} 
+}
+
+export async function POST(req: Request) {
+  try {
+    // Check admin authorization
+    const { admin, error: authError } = await requireAdmin(req);
+    if (authError || !admin) {
+      return NextResponse.json({ error: authError || "Not authorized as admin" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      flight_number,
+      airline_id,
+      origin_airport_id,
+      destination_airport_id,
+      departure_time,
+      arrival_time,
+      duration,
+      price,
+      available_seats,
+      cabin_class,
+      aircraft_type,
+      status = 'SCHEDULED'
+    } = body;
+
+    // Validate required fields
+    if (!flight_number || !airline_id || !origin_airport_id || !destination_airport_id || 
+        !departure_time || !arrival_time || !duration || price === undefined || 
+        available_seats === undefined || !cabin_class) {
+      return NextResponse.json({ 
+        error: "Missing required fields. Please provide: flight_number, airline_id, origin_airport_id, destination_airport_id, departure_time, arrival_time, duration, price, available_seats, cabin_class" 
+      }, { status: 400 });
+    }
+
+    // Validate that origin and destination are different
+    if (origin_airport_id === destination_airport_id) {
+      return NextResponse.json({ 
+        error: "Origin and destination airports must be different" 
+      }, { status: 400 });
+    }
+
+    // Validate departure time is before arrival time
+    if (new Date(departure_time) >= new Date(arrival_time)) {
+      return NextResponse.json({ 
+        error: "Departure time must be before arrival time" 
+      }, { status: 400 });
+    }
+
+    // Validate future flight
+    if (new Date(departure_time) <= new Date()) {
+      return NextResponse.json({ 
+        error: "Departure time must be in the future" 
+      }, { status: 400 });
+    }
+
+    // Validate price and seats
+    if (price < 0 || available_seats < 0) {
+      return NextResponse.json({ 
+        error: "Price and available seats must be non-negative" 
+      }, { status: 400 });
+    }
+
+    // Validate that airline exists
+    const { data: airline, error: airlineError } = await supabaseAdmin
+      .from('airlines')
+      .select('id')
+      .eq('id', airline_id)
+      .single();
+
+    if (airlineError || !airline) {
+      return NextResponse.json({ 
+        error: "Invalid airline ID" 
+      }, { status: 400 });
+    }
+
+    // Validate that airports exist
+    const { data: airports, error: airportsError } = await supabaseAdmin
+      .from('airports')
+      .select('id')
+      .in('id', [origin_airport_id, destination_airport_id]);
+
+    if (airportsError || !airports || airports.length !== 2) {
+      return NextResponse.json({ 
+        error: "Invalid airport ID(s)" 
+      }, { status: 400 });
+    }
+
+    // Create the flight
+    const { data: newFlight, error: createError } = await supabaseAdmin
+      .from('flights')
+      .insert({
+        flight_number,
+        airline_id,
+        origin_airport_id,
+        destination_airport_id,
+        departure_time,
+        arrival_time,
+        duration,
+        price: parseFloat(price),
+        available_seats: parseInt(available_seats),
+        cabin_class,
+        aircraft_type,
+        status
+      })
+      .select(`
+        id,
+        flight_number,
+        departure_time,
+        arrival_time,
+        duration,
+        price,
+        available_seats,
+        cabin_class,
+        aircraft_type,
+        status,
+        airline:airlines ( name, logo_url, country ),
+        origin:airports!flights_origin_airport_id_fkey ( city, code, name, country ),
+        destination:airports!flights_destination_airport_id_fkey ( city, code, name, country )
+      `)
+      .single();
+
+    if (createError) {
+      console.error('Error creating flight:', createError);
+      return NextResponse.json({ error: createError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      flight: newFlight,
+      message: `Flight ${flight_number} created successfully`
+    });
+
+  } catch (error: any) {
+    console.error('Admin create flight API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}

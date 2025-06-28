@@ -55,6 +55,37 @@ interface FlightEditForm {
   status: string;
 }
 
+interface FlightCreateForm {
+  flight_number: string;
+  airline_id: string;
+  origin_airport_id: string;
+  destination_airport_id: string;
+  departure_time: string;
+  arrival_time: string;
+  duration: string;
+  price: number;
+  available_seats: number;
+  cabin_class: string;
+  aircraft_type: string;
+  status: string;
+}
+
+interface Airline {
+  id: string;
+  code: string;
+  name: string;
+  logo_url?: string;
+  country?: string;
+}
+
+interface Airport {
+  id: string;
+  code: string;
+  name: string;
+  city: string;
+  country: string;
+}
+
 export default function AdminFlightsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuthStore();
@@ -68,6 +99,25 @@ export default function AdminFlightsPage() {
     price: 0,
     available_seats: 0,
     status: ''
+  });
+  
+  // Add Flight Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [allAirlines, setAllAirlines] = useState<Airline[]>([]);
+  const [allAirports, setAllAirports] = useState<Airport[]>([]);
+  const [createForm, setCreateForm] = useState<FlightCreateForm>({
+    flight_number: '',
+    airline_id: '',
+    origin_airport_id: '',
+    destination_airport_id: '',
+    departure_time: '',
+    arrival_time: '',
+    duration: '',
+    price: 0,
+    available_seats: 0,
+    cabin_class: 'economy',
+    aircraft_type: '',
+    status: 'SCHEDULED'
   });
   
   // Filters
@@ -88,6 +138,7 @@ export default function AdminFlightsPage() {
 
     if (user && isAdminEmail(user.email)) {
       fetchFlights();
+      fetchAirlinesAndAirports();
     }
   }, [user, isLoading]);
 
@@ -120,6 +171,134 @@ export default function AdminFlightsPage() {
     } catch (err: any) {
       setError(err.message);
       console.error('Error fetching flights:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAirlinesAndAirports = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+
+      if (!accessToken) {
+        setError('Not authenticated');
+        return;
+      }
+
+      // Fetch airlines and airports in parallel
+      const [airlinesResponse, airportsResponse] = await Promise.all([
+        fetch('/api/admin/airlines', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        }),
+        fetch('/api/admin/airports', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        })
+      ]);
+
+      if (airlinesResponse.ok) {
+        const airlinesData = await airlinesResponse.json();
+        setAllAirlines(airlinesData.airlines);
+      }
+
+      if (airportsResponse.ok) {
+        const airportsData = await airportsResponse.json();
+        setAllAirports(airportsData.airports);
+      }
+    } catch (err: any) {
+      console.error('Error fetching airlines/airports:', err);
+    }
+  };
+
+  const calculateDuration = (departure: string, arrival: string) => {
+    if (!departure || !arrival) return '';
+    
+    const dep = new Date(departure);
+    const arr = new Date(arrival);
+    const diffMs = arr.getTime() - dep.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${diffHours}h ${diffMinutes}m`;
+  };
+
+  const handleCreateSubmit = async () => {
+    try {
+      // Validate form
+      if (!createForm.flight_number || !createForm.airline_id || !createForm.origin_airport_id || 
+          !createForm.destination_airport_id || !createForm.departure_time || !createForm.arrival_time) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      if (createForm.origin_airport_id === createForm.destination_airport_id) {
+        toast.error('Origin and destination airports must be different');
+        return;
+      }
+
+      if (new Date(createForm.departure_time) >= new Date(createForm.arrival_time)) {
+        toast.error('Departure time must be before arrival time');
+        return;
+      }
+
+      if (new Date(createForm.departure_time) <= new Date()) {
+        toast.error('Departure time must be in the future');
+        return;
+      }
+
+      setLoading(true);
+      
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('Not authenticated');
+      }
+
+      // Calculate duration automatically
+      const duration = calculateDuration(createForm.departure_time, createForm.arrival_time);
+      const submitData = { ...createForm, duration };
+
+      const response = await fetch('/api/admin/flights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(submitData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create flight');
+      }
+
+      const result = await response.json();
+      
+      toast.success(`Flight ${createForm.flight_number} created successfully!`);
+      
+      // Reset form and close modal
+      setCreateForm({
+        flight_number: '',
+        airline_id: '',
+        origin_airport_id: '',
+        destination_airport_id: '',
+        departure_time: '',
+        arrival_time: '',
+        duration: '',
+        price: 0,
+        available_seats: 0,
+        cabin_class: 'economy',
+        aircraft_type: '',
+        status: 'SCHEDULED'
+      });
+      setShowAddModal(false);
+      
+      // Refresh flights list
+      fetchFlights();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create flight');
+      console.error('Error creating flight:', err);
     } finally {
       setLoading(false);
     }
@@ -282,6 +461,13 @@ export default function AdminFlightsPage() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <Button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Flight
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => router.push('/admin')}
@@ -586,6 +772,189 @@ export default function AdminFlightsPage() {
                 <Button
                   variant="outline"
                   onClick={cancelEditing}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Add Flight Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            >
+              <h3 className="text-lg font-semibold mb-4">Add New Flight</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Flight Number *</label>
+                  <Input
+                    placeholder="e.g., AA123"
+                    value={createForm.flight_number}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, flight_number: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Airline *</label>
+                  <select
+                    value={createForm.airline_id}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, airline_id: e.target.value }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800"
+                  >
+                    <option value="">Select Airline</option>
+                    {allAirlines.map(airline => (
+                      <option key={airline.id} value={airline.id}>
+                        {airline.name} ({airline.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Origin Airport *</label>
+                  <select
+                    value={createForm.origin_airport_id}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, origin_airport_id: e.target.value }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800"
+                  >
+                    <option value="">Select Origin</option>
+                    {allAirports.map(airport => (
+                      <option key={airport.id} value={airport.id}>
+                        {airport.city} ({airport.code}) - {airport.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Destination Airport *</label>
+                  <select
+                    value={createForm.destination_airport_id}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, destination_airport_id: e.target.value }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800"
+                  >
+                    <option value="">Select Destination</option>
+                    {allAirports.map(airport => (
+                      <option key={airport.id} value={airport.id}>
+                        {airport.city} ({airport.code}) - {airport.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Departure Time *</label>
+                  <Input
+                    type="datetime-local"
+                    value={createForm.departure_time}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, departure_time: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Arrival Time *</label>
+                  <Input
+                    type="datetime-local"
+                    value={createForm.arrival_time}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, arrival_time: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Price (USD) *</label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={createForm.price}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Available Seats *</label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={createForm.available_seats}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, available_seats: parseInt(e.target.value) || 0 }))}
+                    min="0"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Cabin Class *</label>
+                  <select
+                    value={createForm.cabin_class}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, cabin_class: e.target.value }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800"
+                  >
+                    <option value="economy">Economy</option>
+                    <option value="business">Business</option>
+                    <option value="first">First</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Status</label>
+                  <select
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-800"
+                  >
+                    <option value="SCHEDULED">Scheduled</option>
+                    <option value="DELAYED">Delayed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="BOARDING">Boarding</option>
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Aircraft Type</label>
+                  <Input
+                    placeholder="e.g., Boeing 737, Airbus A320"
+                    value={createForm.aircraft_type}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, aircraft_type: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-6">
+                <Button
+                  onClick={handleCreateSubmit}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? 'Creating...' : 'Create Flight'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setCreateForm({
+                      flight_number: '',
+                      airline_id: '',
+                      origin_airport_id: '',
+                      destination_airport_id: '',
+                      departure_time: '',
+                      arrival_time: '',
+                      duration: '',
+                      price: 0,
+                      available_seats: 0,
+                      cabin_class: 'economy',
+                      aircraft_type: '',
+                      status: 'SCHEDULED'
+                    });
+                  }}
                   disabled={loading}
                   className="flex-1"
                 >
