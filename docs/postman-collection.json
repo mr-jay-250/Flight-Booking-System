@@ -1,0 +1,429 @@
+{
+  "info": {
+    "name": "Flight Booking API",
+    "description": "Complete API collection for the Flight Booking System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "your-supabase-access-token",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "your-admin-access-token",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Search Flights",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"{{origin_airport_id}}\",\n  \"destination\": \"{{destination_airport_id}}\",\n  \"departureDate\": \"2024-02-15\",\n  \"returnDate\": \"2024-02-22\",\n  \"tripType\": \"roundtrip\",\n  \"outboundCabin\": \"economy\",\n  \"returnCabin\": \"economy\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/flights/search",
+              "host": ["{{base_url}}"],
+              "path": ["api", "flights", "search"]
+            },
+            "description": "Search for flights with various filters"
+          }
+        },
+        {
+          "name": "Get Flight Details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/flights/{{flight_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "flights", "{{flight_id}}"]
+            },
+            "description": "Get detailed information about a specific flight"
+          }
+        },
+        {
+          "name": "Get All Flights",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/flights",
+              "host": ["{{base_url}}"],
+              "path": ["api", "flights"]
+            },
+            "description": "Get all available flights"
+          }
+        },
+        {
+          "name": "Get Flight Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/flights/{{flight_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "flights", "{{flight_id}}", "status"]
+            },
+            "description": "Get current status of a flight"
+          }
+        },
+        {
+          "name": "Test Email Service",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/test-email",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test-email"]
+            },
+            "description": "Test the email notification system"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Endpoints",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flight_id\": \"{{flight_id}}\",\n  \"full_name\": \"John Doe\",\n  \"date_of_birth\": \"1990-01-01\",\n  \"gender\": \"male\",\n  \"nationality\": \"US\",\n  \"passport_number\": \"123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Create a new flight booking"
+          }
+        },
+        {
+          "name": "Get User Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Get all bookings for the authenticated user"
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": \"{{booking_id}}\",\n  \"action\": \"cancel\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Cancel an existing booking"
+          }
+        },
+        {
+          "name": "Modify Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": \"{{booking_id}}\",\n  \"action\": \"modify\",\n  \"updateData\": {\n    \"full_name\": \"Jane Doe\",\n    \"nationality\": \"CA\",\n    \"passport_number\": \"987654321\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "description": "Modify passenger details in an existing booking"
+          }
+        },
+        {
+          "name": "Get Flight Seats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/flights/{{flight_id}}/seats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "flights", "{{flight_id}}", "seats"]
+            },
+            "description": "Get available seats for a flight"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Endpoints",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{admin_token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get All Flights (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/flights?status=all&search=&airline=all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "flights"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "all",
+                  "description": "Filter by status: all|scheduled|delayed|cancelled"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by flight number, airline, or city"
+                },
+                {
+                  "key": "airline",
+                  "value": "all",
+                  "description": "Filter by specific airline"
+                }
+              ]
+            },
+            "description": "Get all flights with admin privileges and filtering"
+          }
+        },
+        {
+          "name": "Update Flight (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departure_time\": \"2024-02-15T10:30:00Z\",\n  \"arrival_time\": \"2024-02-15T14:30:00Z\",\n  \"price\": 299.99,\n  \"available_seats\": 150,\n  \"status\": \"scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/flights/{{flight_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "flights", "{{flight_id}}"]
+            },
+            "description": "Update flight details with automatic passenger notifications"
+          }
+        },
+        {
+          "name": "Get All Bookings (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/bookings?status=CONFIRMED&flight_id=&date_from=&date_to=",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "bookings"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "CONFIRMED",
+                  "description": "Filter by booking status: CONFIRMED|CANCELLED|PENDING"
+                },
+                {
+                  "key": "flight_id",
+                  "value": "",
+                  "description": "Filter by specific flight ID"
+                },
+                {
+                  "key": "date_from",
+                  "value": "",
+                  "description": "Filter bookings from date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "date_to",
+                  "value": "",
+                  "description": "Filter bookings to date (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": "Get all bookings with admin privileges and filtering"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// You can add pre-request scripts here",
+          "// For example, to automatically set timestamps or generate UUIDs",
+          "",
+          "// Set current timestamp",
+          "pm.globals.set('timestamp', new Date().toISOString());",
+          "",
+          "// Example UUIDs for testing (replace with actual values)",
+          "if (!pm.globals.get('flight_id')) {",
+          "    pm.globals.set('flight_id', 'example-flight-uuid-123');",
+          "}",
+          "",
+          "if (!pm.globals.get('booking_id')) {",
+          "    pm.globals.set('booking_id', 'example-booking-uuid-123');",
+          "}",
+          "",
+          "if (!pm.globals.get('origin_airport_id')) {",
+          "    pm.globals.set('origin_airport_id', 'example-origin-uuid-123');",
+          "}",
+          "",
+          "if (!pm.globals.get('destination_airport_id')) {",
+          "    pm.globals.set('destination_airport_id', 'example-dest-uuid-123');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test scripts",
+          "",
+          "// Check if response time is reasonable",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "// Check content type for JSON responses",
+          "if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+          "    pm.test('Response is valid JSON', function () {",
+          "        pm.response.to.be.json;",
+          "    });",
+          "}",
+          "",
+          "// Save commonly used values for subsequent requests",
+          "if (pm.response.code === 200 || pm.response.code === 201) {",
+          "    try {",
+          "        const response = pm.response.json();",
+          "        ",
+          "        // Save booking ID from create booking response",
+          "        if (response.booking_id) {",
+          "            pm.globals.set('booking_id', response.booking_id);",
+          "        }",
+          "        ",
+          "        // Save flight ID from search results",
+          "        if (response.flights && response.flights.length > 0) {",
+          "            pm.globals.set('flight_id', response.flights[0].id);",
+          "        }",
+          "    } catch (e) {",
+          "        // Response is not JSON, skip",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+} 

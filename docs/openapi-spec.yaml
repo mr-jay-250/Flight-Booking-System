@@ -1,0 +1,1080 @@
+openapi: 3.0.3
+info:
+  title: Flight Booking System API
+  description: |
+    A comprehensive flight booking system API built with Next.js and Supabase.
+    
+    ## Features
+    - Flight search with advanced filters
+    - User booking management
+    - Admin flight management
+    - Real-time notifications
+    - Seat selection
+    - Email confirmations
+    
+    ## Authentication
+    This API uses JWT-based authentication via Supabase. Include the access token in the Authorization header as `Bearer <token>`.
+    
+    ## Rate Limiting
+    - General endpoints: 100 requests/minute per IP
+    - Search endpoints: 20 requests/minute per IP
+    - Admin endpoints: 200 requests/minute per admin
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@yourflightbooking.com
+  license:
+    name: MIT
+    
+servers:
+  - url: https://api.yourflightbooking.com
+    description: Production server
+  - url: https://api-test.yourflightbooking.com
+    description: Test server
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Public
+    description: Public endpoints that don't require authentication
+  - name: User
+    description: User endpoints that require authentication
+  - name: Admin
+    description: Admin endpoints that require admin privileges
+
+paths:
+  /api/flights/search:
+    post:
+      tags:
+        - Public
+      summary: Search flights
+      description: Search for flights based on origin, destination, dates, and preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlightSearchRequest'
+            examples:
+              oneway:
+                summary: One-way flight search
+                value:
+                  origin: "jfk-airport-uuid"
+                  destination: "lax-airport-uuid"
+                  departureDate: "2024-02-15"
+                  tripType: "oneway"
+                  outboundCabin: "economy"
+              roundtrip:
+                summary: Round-trip flight search
+                value:
+                  origin: "jfk-airport-uuid"
+                  destination: "lax-airport-uuid"
+                  departureDate: "2024-02-15"
+                  returnDate: "2024-02-22"
+                  tripType: "roundtrip"
+                  outboundCabin: "business"
+                  returnCabin: "business"
+      responses:
+        '200':
+          description: Flight search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/flights/{id}:
+    get:
+      tags:
+        - Public
+      summary: Get flight details
+      description: Retrieve detailed information about a specific flight
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Flight ID
+      responses:
+        '200':
+          description: Flight details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/flights:
+    get:
+      tags:
+        - Public
+      summary: Get all available flights
+      description: Retrieve all available flights
+      responses:
+        '200':
+          description: List of available flights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flights:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Flight'
+
+  /api/flights/{id}/status:
+    get:
+      tags:
+        - Public
+      summary: Get flight status
+      description: Check the current status of a specific flight
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Flight ID
+      responses:
+        '200':
+          description: Flight status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightStatus'
+
+  /api/flights/{id}/seats:
+    get:
+      tags:
+        - User
+      summary: Get available seats
+      description: Retrieve available seats for a flight
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Flight ID
+      responses:
+        '200':
+          description: Available seats information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/bookings:
+    post:
+      tags:
+        - User
+      summary: Create booking
+      description: Create a new flight booking
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+            example:
+              flight_id: "flight-uuid-123"
+              full_name: "John Doe"
+              date_of_birth: "1990-01-01"
+              gender: "male"
+              nationality: "US"
+              passport_number: "123456789"
+      responses:
+        '201':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingCreatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    get:
+      tags:
+        - User
+      summary: Get user bookings
+      description: Retrieve all bookings for the authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User's bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBookingsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags:
+        - User
+      summary: Modify or cancel booking
+      description: Update or cancel an existing booking
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CancelBookingRequest'
+                - $ref: '#/components/schemas/ModifyBookingRequest'
+            examples:
+              cancel:
+                summary: Cancel booking
+                value:
+                  booking_id: "booking-uuid-123"
+                  action: "cancel"
+              modify:
+                summary: Modify booking
+                value:
+                  booking_id: "booking-uuid-123"
+                  action: "modify"
+                  updateData:
+                    full_name: "Jane Doe"
+                    nationality: "CA"
+      responses:
+        '200':
+          description: Booking updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingActionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/flights:
+    get:
+      tags:
+        - Admin
+      summary: Get all flights (Admin)
+      description: Retrieve all flights with advanced filtering and booking statistics
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, scheduled, delayed, cancelled, boarding, departed, arrived]
+          description: Filter by flight status
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by flight number, airline, or city
+        - name: airline
+          in: query
+          schema:
+            type: string
+          description: Filter by specific airline
+      responses:
+        '200':
+          description: Admin flight list with statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminFlightsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/flights/{id}:
+    patch:
+      tags:
+        - Admin
+      summary: Update flight (Admin)
+      description: Update flight details and automatically notify affected passengers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Flight ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFlightRequest'
+            example:
+              departure_time: "2024-02-15T10:30:00Z"
+              arrival_time: "2024-02-15T14:30:00Z"
+              price: 299.99
+              available_seats: 150
+              status: "scheduled"
+      responses:
+        '200':
+          description: Flight updated successfully with notification details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightUpdateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/bookings:
+    get:
+      tags:
+        - Admin
+      summary: Get all bookings (Admin)
+      description: Retrieve all bookings in the system with filtering options
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [CONFIRMED, CANCELLED, PENDING]
+          description: Filter by booking status
+        - name: flight_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by specific flight
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bookings from date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bookings to date
+      responses:
+        '200':
+          description: Admin booking list with statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminBookingsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/test-email:
+    get:
+      tags:
+        - Public
+      summary: Test email service
+      description: Test the email notification system
+      responses:
+        '200':
+          description: Email test results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  emailResult:
+                    type: object
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT access token
+
+  schemas:
+    FlightSearchRequest:
+      type: object
+      required:
+        - origin
+        - destination
+        - departureDate
+        - tripType
+      properties:
+        origin:
+          type: string
+          format: uuid
+          description: Origin airport ID
+        destination:
+          type: string
+          format: uuid
+          description: Destination airport ID
+        departureDate:
+          type: string
+          format: date
+          description: Departure date (YYYY-MM-DD)
+        returnDate:
+          type: string
+          format: date
+          description: Return date (YYYY-MM-DD, required for roundtrip)
+        tripType:
+          type: string
+          enum: [oneway, roundtrip]
+          description: Type of trip
+        outboundCabin:
+          type: string
+          enum: [economy, business, first]
+          description: Outbound cabin class
+        returnCabin:
+          type: string
+          enum: [economy, business, first]
+          description: Return cabin class (for roundtrip)
+
+    FlightSearchResponse:
+      type: object
+      properties:
+        flights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flight'
+        returnFlights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flight'
+          description: Return flights (only for roundtrip)
+        searchCriteria:
+          $ref: '#/components/schemas/SearchCriteria'
+
+    Flight:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        flight_number:
+          type: string
+        airline_id:
+          type: string
+          format: uuid
+        airline_name:
+          type: string
+        airline_logo_url:
+          type: string
+          format: uri
+        airline_code:
+          type: string
+        airline_country:
+          type: string
+        origin_airport_id:
+          type: string
+          format: uuid
+        origin_city:
+          type: string
+        origin_code:
+          type: string
+        origin_name:
+          type: string
+        origin_country:
+          type: string
+        destination_airport_id:
+          type: string
+          format: uuid
+        destination_city:
+          type: string
+        destination_code:
+          type: string
+        destination_name:
+          type: string
+        destination_country:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        duration:
+          type: string
+          example: "2h 30m"
+        price:
+          type: number
+          format: double
+          minimum: 0
+        available_seats:
+          type: integer
+          minimum: 0
+        cabin_class:
+          type: string
+          enum: [economy, business, first]
+        aircraft_type:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, delayed, cancelled, boarding, departed, arrived]
+
+    FlightDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        flight_number:
+          type: string
+        airline_name:
+          type: string
+        airline_logo_url:
+          type: string
+          format: uri
+        origin_city:
+          type: string
+        origin_code:
+          type: string
+        destination_city:
+          type: string
+        destination_code:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        duration:
+          type: string
+        price:
+          type: number
+          format: double
+        available_seats:
+          type: integer
+
+    FlightStatus:
+      type: object
+      properties:
+        flight_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [scheduled, delayed, cancelled, boarding, departed, arrived]
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        delay_minutes:
+          type: integer
+          description: Delay in minutes (if applicable)
+        gate:
+          type: string
+          description: Departure gate
+        terminal:
+          type: string
+          description: Departure terminal
+
+    SeatsResponse:
+      type: object
+      properties:
+        available_seats:
+          type: integer
+        seat_map:
+          type: array
+          items:
+            type: object
+          description: Seat configuration data
+        occupied_seats:
+          type: array
+          items:
+            type: string
+          description: List of occupied seat numbers
+
+    CreateBookingRequest:
+      type: object
+      required:
+        - flight_id
+        - full_name
+        - date_of_birth
+        - gender
+        - nationality
+        - passport_number
+      properties:
+        flight_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        date_of_birth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, other]
+        nationality:
+          type: string
+          minLength: 2
+          maxLength: 10
+        passport_number:
+          type: string
+          minLength: 5
+          maxLength: 20
+
+    BookingCreatedResponse:
+      type: object
+      properties:
+        ticket_url:
+          type: string
+          format: uri
+        booking_id:
+          type: string
+          format: uuid
+        booking_reference:
+          type: string
+          pattern: '^[A-Z0-9]{8}$'
+        seat_number:
+          type: string
+          example: "12A"
+
+    CancelBookingRequest:
+      type: object
+      required:
+        - booking_id
+        - action
+      properties:
+        booking_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [cancel]
+
+    ModifyBookingRequest:
+      type: object
+      required:
+        - booking_id
+        - action
+        - updateData
+      properties:
+        booking_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [modify]
+        updateData:
+          type: object
+          properties:
+            full_name:
+              type: string
+            nationality:
+              type: string
+            passport_number:
+              type: string
+            flight_id:
+              type: string
+              format: uuid
+
+    BookingActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    UserBookingsResponse:
+      type: object
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_reference:
+          type: string
+        booking_status:
+          type: string
+          enum: [CONFIRMED, CANCELLED, PENDING]
+        total_price:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        ticket_url:
+          type: string
+          format: uri
+        flight:
+          $ref: '#/components/schemas/FlightSummary'
+        passenger:
+          $ref: '#/components/schemas/Passenger'
+
+    FlightSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        flight_number:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        duration:
+          type: string
+        price:
+          type: number
+          format: double
+        airline:
+          type: object
+          properties:
+            name:
+              type: string
+            logo_url:
+              type: string
+              format: uri
+        origin:
+          type: object
+          properties:
+            city:
+              type: string
+            code:
+              type: string
+        destination:
+          type: object
+          properties:
+            city:
+              type: string
+            code:
+              type: string
+
+    Passenger:
+      type: object
+      properties:
+        full_name:
+          type: string
+        seat_number:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        gender:
+          type: string
+        nationality:
+          type: string
+        passport_number:
+          type: string
+
+    UpdateFlightRequest:
+      type: object
+      required:
+        - departure_time
+        - arrival_time
+        - price
+        - available_seats
+        - status
+      properties:
+        departure_time:
+          type: string
+          format: date-time
+        arrival_time:
+          type: string
+          format: date-time
+        price:
+          type: number
+          format: double
+          minimum: 0
+        available_seats:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [scheduled, delayed, cancelled, boarding, departed, arrived]
+
+    FlightUpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        notificationsSent:
+          type: integer
+        totalBookings:
+          type: integer
+        hasChanges:
+          type: boolean
+        changes:
+          type: array
+          items:
+            type: string
+        notificationDetails:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationDetail'
+        flightNumber:
+          type: string
+
+    NotificationDetail:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        passenger:
+          type: string
+        booking_ref:
+          type: string
+        status:
+          type: string
+          enum: [sent, failed]
+        error:
+          type: string
+
+    AdminFlightsResponse:
+      type: object
+      properties:
+        flights:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminFlight'
+        total:
+          type: integer
+
+    AdminFlight:
+      allOf:
+        - $ref: '#/components/schemas/Flight'
+        - type: object
+          properties:
+            total_bookings:
+              type: integer
+
+    AdminBookingsResponse:
+      type: object
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminBooking'
+        total:
+          type: integer
+        statistics:
+          $ref: '#/components/schemas/BookingStatistics'
+
+    AdminBooking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_reference:
+          type: string
+        booking_status:
+          type: string
+          enum: [CONFIRMED, CANCELLED, PENDING]
+        total_price:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            full_name:
+              type: string
+        flight:
+          type: object
+          properties:
+            flight_number:
+              type: string
+            departure_time:
+              type: string
+              format: date-time
+            airline:
+              type: object
+              properties:
+                name:
+                  type: string
+            origin:
+              type: object
+              properties:
+                city:
+                  type: string
+                code:
+                  type: string
+            destination:
+              type: object
+              properties:
+                city:
+                  type: string
+                code:
+                  type: string
+        passenger:
+          type: object
+          properties:
+            full_name:
+              type: string
+            seat_number:
+              type: string
+
+    BookingStatistics:
+      type: object
+      properties:
+        total_revenue:
+          type: number
+          format: double
+        confirmed_bookings:
+          type: integer
+        cancelled_bookings:
+          type: integer
+
+    SearchCriteria:
+      type: object
+      properties:
+        origin:
+          type: string
+        destination:
+          type: string
+        departureDate:
+          type: string
+          format: date
+        returnDate:
+          type: string
+          format: date
+        tripType:
+          type: string
+        outboundCabin:
+          type: string
+        returnCabin:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code (optional)
+        details:
+          type: object
+          description: Additional error details (optional)
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validation_error:
+              value:
+                error: "Missing required fields"
+                details:
+                  missing_fields: ["departure_time", "arrival_time"]
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not authenticated"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not authorized as admin"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Flight not found"
+
+    Conflict:
+      description: Conflict - business logic violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            no_seats:
+              value:
+                error: "No seats available"
+                details:
+                  available_seats: 0
+                  requested_seats: 1
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error" 
