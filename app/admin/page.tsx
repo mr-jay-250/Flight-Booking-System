@@ -13,11 +13,11 @@ import {
   CheckCircle, 
   XCircle,
   Eye,
-  Download,
   RefreshCw,
   BarChart3,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { isAdminEmail } from '@/lib/admin-auth';
+import { toast } from 'sonner';
 
 interface Booking {
   id: string;
@@ -94,6 +95,10 @@ export default function AdminDashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Add modal state for viewing booking details
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -231,7 +236,7 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Actions */}
         <motion.div 
-          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -259,20 +264,6 @@ export default function AdminDashboard() {
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">View Bookings</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Manage customer bookings and reservations</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/')}>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Site Analytics</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">View website performance and user metrics</p>
                 </div>
               </div>
             </CardContent>
@@ -504,22 +495,12 @@ export default function AdminDashboard() {
                               variant="outline"
                               onClick={() => {
                                 // View booking details
-                                console.log('View booking:', booking);
+                                setSelectedBooking(booking);
+                                setShowViewModal(true);
                               }}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {booking.ticket_url && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  window.open(booking.ticket_url, '_blank');
-                                }}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -558,6 +539,152 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* View Booking Modal */}
+      {showViewModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Booking Details</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowViewModal(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Booking Information */}
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-3">Booking Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Reference:</span>
+                      <span className="font-mono font-bold">{selectedBooking.booking_reference}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedBooking.booking_status)}`}>
+                        {selectedBooking.booking_status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Price:</span>
+                      <span className="font-bold">{formatCurrency(selectedBooking.total_price)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Payment Status:</span>
+                      <span className="font-medium">{selectedBooking.payment_status}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Booking Date:</span>
+                      <span>{formatDate(selectedBooking.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Passenger Information */}
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <h3 className="font-semibold text-green-900 dark:text-green-300 mb-3">Passenger Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Name:</span>
+                      <span className="font-medium">{selectedBooking.passenger[0]?.full_name || selectedBooking.user.full_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Email:</span>
+                      <span className="font-medium">{selectedBooking.user.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Phone:</span>
+                      <span className="font-medium">{selectedBooking.user.phone_number || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Seat:</span>
+                      <span className="font-mono font-bold">{selectedBooking.passenger[0]?.seat_number || 'N/A'}</span>
+                    </div>
+                    {selectedBooking.passenger[0]?.passport_number && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Passport:</span>
+                        <span className="font-mono">{selectedBooking.passenger[0].passport_number}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Flight Information */}
+              <div className="space-y-4">
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                  <h3 className="font-semibold text-purple-900 dark:text-purple-300 mb-3">Flight Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Flight Number:</span>
+                      <span className="font-bold">{selectedBooking.flight.flight_number}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Airline:</span>
+                      <span className="font-medium">{selectedBooking.flight.airline.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Route:</span>
+                      <span className="font-medium">
+                        {selectedBooking.flight.origin[0]?.city} → {selectedBooking.flight.destination[0]?.city}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Departure:</span>
+                      <span className="font-medium">{formatDate(selectedBooking.flight.departure_time)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Arrival:</span>
+                      <span className="font-medium">{formatDate(selectedBooking.flight.arrival_time)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Duration:</span>
+                      <span className="font-medium">{selectedBooking.flight.duration}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-gray-50 dark:bg-gray-900/20 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-300 mb-3">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedBooking.booking_reference);
+                        toast.success('Booking reference copied to clipboard!');
+                      }}
+                      className="w-full flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Copy Booking Reference
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowViewModal(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 } 
